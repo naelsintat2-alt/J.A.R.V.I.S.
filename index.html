@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="JARVIS">
+<meta name="theme-color" content="#050b16">
+<title>J.A.R.V.I.S.</title>
+<style>
+:root{
+  --bg:#050b16; --panel:#0b1626; --line:#17304d; --blue:#3ab8ff; --blue-dim:#1c6ea4;
+  --text:#d9ecff; --muted:#7b94ad; --user:#0f2a47; --err:#ff7a7a;
+  --font:ui-rounded,"SF Pro Rounded",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%}
+body{background:radial-gradient(120% 60% at 50% 0%,#0a1d33 0%,var(--bg) 60%);color:var(--text);
+  font-family:var(--font);display:flex;flex-direction:column;
+  padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0)}
+header{display:flex;align-items:center;gap:14px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.core{width:44px;height:44px;border-radius:50%;flex:none;
+  background:radial-gradient(circle,#dff4ff 0 8%,var(--blue) 9% 20%,transparent 21%),
+  conic-gradient(from 0deg,var(--blue-dim),transparent 25%,var(--blue-dim) 50%,transparent 75%,var(--blue-dim));
+  border:2px solid var(--blue-dim);box-shadow:0 0 14px #3ab8ff55}
+.core.busy{animation:spin 1.2s linear infinite;box-shadow:0 0 22px #3ab8ffaa}
+@keyframes spin{to{transform:rotate(360deg)}}
+h1{font-size:19px;letter-spacing:.28em;font-weight:600}
+.sub{font-size:12px;color:var(--muted);margin-top:2px}
+.grow{flex:1}
+button{font:inherit;color:inherit;cursor:pointer}
+.icon{background:none;border:1px solid var(--line);border-radius:10px;width:40px;height:40px;font-size:18px}
+.icon:focus-visible,#send:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+#log{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:12px;max-width:760px;width:100%;margin:0 auto}
+.msg{max-width:88%;padding:11px 14px;border-radius:14px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;font-size:16px}
+.me{align-self:flex-end;background:var(--user);border:1px solid var(--line);border-bottom-right-radius:4px}
+.ai{align-self:flex-start;background:var(--panel);border-left:3px solid var(--blue);border-bottom-left-radius:4px}
+.err{align-self:flex-start;color:var(--err);border-left:3px solid var(--err);background:var(--panel)}
+.hint{margin:auto;text-align:center;color:var(--muted);font-size:15px;line-height:1.5;max-width:300px}
+#bar{display:flex;gap:10px;padding:12px 14px;border-top:1px solid var(--line);max-width:760px;width:100%;margin:0 auto}
+textarea{flex:1;resize:none;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:12px;
+  padding:11px 13px;font:inherit;font-size:16px;max-height:120px}
+#send{background:var(--blue);color:#02111f;border:0;border-radius:12px;padding:0 18px;font-weight:600}
+#send:disabled{opacity:.45}
+dialog{margin:auto;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:16px;padding:20px;width:min(420px,92vw)}
+dialog::backdrop{background:#000a}
+label{display:block;font-size:14px;color:var(--muted);margin:14px 0 6px}
+input{width:100%;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:11px;font:inherit;font-size:16px}
+.row{display:flex;gap:10px;margin-top:18px}
+.row button{flex:1;padding:11px;border-radius:10px;border:1px solid var(--line);background:none}
+.row .ok{background:var(--blue);color:#02111f;border:0;font-weight:600}
+.note{font-size:13px;color:var(--muted);margin-top:12px;line-height:1.4}
+@media (prefers-reduced-motion:reduce){.core.busy{animation:none}}
+</style>
+</head>
+<body>
+<header>
+  <div class="core" id="core"></div>
+  <div><h1>J.A.R.V.I.S.</h1><div class="sub" id="status">Bereit</div></div>
+  <div class="grow"></div>
+  <button class="icon" id="clear" title="Neues Gespräch" aria-label="Neues Gespräch">↺</button>
+  <button class="icon" id="cfg" title="Einstellungen" aria-label="Einstellungen">⚙</button>
+</header>
+
+<main id="log" aria-live="polite"></main>
+
+<div id="bar">
+  <textarea id="in" rows="1" placeholder="Schreib J.A.R.V.I.S. eine Nachricht" aria-label="Nachricht"></textarea>
+  <button id="send">Senden</button>
+</div>
+
+<dialog id="dlg">
+  <h2 style="font-size:18px">Einstellungen</h2>
+  <label for="key">Gemini API-Schlüssel</label>
+  <input id="key" type="password" autocomplete="off" placeholder="Schlüssel hier einfügen">
+  <label for="model">Modell</label>
+  <input id="model" type="text" autocomplete="off">
+  <p class="note">Der Schlüssel wird nur auf diesem Gerät gespeichert. Deine Nachrichten gehen an Google.</p>
+  <div class="row"><button id="cancel">Abbrechen</button><button class="ok" id="save">Speichern</button></div>
+</dialog>
+
+<script>
+const $ = id => document.getElementById(id);
+const log = $("log"), input = $("in"), sendBtn = $("send"), core = $("core"), status = $("status"), dlg = $("dlg");
+const DEFAULT_MODEL = "gemini-2.5-flash";
+const SYSTEM = "Du bist J.A.R.V.I.S., der persönliche KI-Assistent des Nutzers, inspiriert von Iron Man. " +
+  "Antworte auf Deutsch, präzise, freundlich und mit einem Hauch trockenem Humor. " +
+  "Behaupte nie, Aktionen ausgeführt zu haben, die du nicht ausführen kannst.";
+let history = [];
+
+function store(k, v){ try{ if(v===undefined) return localStorage.getItem(k); localStorage.setItem(k, v); }catch(e){ return null; } }
+
+function add(cls, text){
+  const hint = log.querySelector(".hint"); if(hint) hint.remove();
+  const d = document.createElement("div");
+  d.className = "msg " + cls; d.textContent = text;
+  log.appendChild(d); log.scrollTop = log.scrollHeight; return d;
+}
+function showHint(){
+  log.innerHTML = '<p class="hint">Guten Tag. Ich bin J.A.R.V.I.S. Wie kann ich helfen?</p>';
+}
+function busy(on){
+  core.classList.toggle("busy", on); sendBtn.disabled = on;
+  status.textContent = on ? "Denke nach…" : "Bereit";
+}
+
+async function send(){
+  const text = input.value.trim(); if(!text || sendBtn.disabled) return;
+  const key = store("jarvis_key");
+  if(!key){ add("err", "Kein API-Schlüssel hinterlegt. Tippe oben auf ⚙ und füge ihn ein."); return; }
+  input.value = ""; input.style.height = "auto";
+  add("me", text); history.push({role:"user", parts:[{text}]});
+  busy(true);
+  try{
+    const model = store("jarvis_model") || DEFAULT_MODEL;
+    const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
+      method:"POST",
+      headers:{"Content-Type":"application/json","x-goog-api-key":key},
+      body: JSON.stringify({ systemInstruction:{parts:[{text:SYSTEM}]}, contents:history })
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error((data.error && data.error.message) || ("Fehler " + res.status));
+    const reply = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || "").join("").trim();
+    if(!reply) throw new Error("Die Antwort war leer. Formuliere die Frage anders.");
+    history.push({role:"model", parts:[{text:reply}]});
+    add("ai", reply);
+  }catch(e){
+    history.pop();
+    add("err", "Das hat nicht geklappt: " + e.message);
+  }
+  busy(false); input.focus();
+}
+
+sendBtn.onclick = send;
+input.addEventListener("keydown", e => { if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); send(); } });
+input.addEventListener("input", () => { input.style.height = "auto"; input.style.height = input.scrollHeight + "px"; });
+$("clear").onclick = () => { history = []; showHint(); };
+$("cfg").onclick = () => { $("key").value = store("jarvis_key") || ""; $("model").value = store("jarvis_model") || DEFAULT_MODEL; dlg.showModal(); };
+$("cancel").onclick = () => dlg.close();
+$("save").onclick = () => { store("jarvis_key", $("key").value.trim()); store("jarvis_model", $("model").value.trim() || DEFAULT_MODEL); dlg.close(); };
+showHint();
+</script>
+</body>
+</html>
